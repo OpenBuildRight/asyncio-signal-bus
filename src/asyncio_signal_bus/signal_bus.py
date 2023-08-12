@@ -16,7 +16,7 @@ R = TypeVar("R")
 
 class SignalBus:
     def __init__(self):
-        self._queues: Dict[str, Queue] = {}
+        self._queues: Dict[str, List[Queue]] = {}
         self._subscribers: List[SignalSubscriber] = []
         self._publishers = []
 
@@ -24,8 +24,9 @@ class SignalBus:
         return self._queues.get(queue_name)
 
     def subscriber(self, topic_name="default", error_handler=SubscriberErrorHandler):
-        self._queues.setdefault(topic_name, Queue())
-        queue = self._queues.get(topic_name)
+        self._queues.setdefault(topic_name, [])
+        queue = Queue()
+        self._queues.get(topic_name).append(queue)
 
         def _wrapper(f: Callable[[Any], Awaitable[Any]]):
             s = SignalSubscriber(error_handler(f), queue)
@@ -36,11 +37,11 @@ class SignalBus:
         return _wrapper
 
     def publisher(self, topic_name="default"):
-        self._queues.setdefault(topic_name, Queue())
-        queue = self._queues.get(topic_name)
+        self._queues.setdefault(topic_name, [])
+        queues = self._queues.get(topic_name)
 
         def _wrapper(f: Callable[[Any], Awaitable[Any]]):
-            return SignalPublisher(f, queue)
+            return SignalPublisher(f, queues)
 
         return _wrapper
 
