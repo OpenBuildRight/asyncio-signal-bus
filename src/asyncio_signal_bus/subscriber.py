@@ -27,7 +27,10 @@ class SignalSubscriber(Generic[S, R]):
             self._listening_task = asyncio.create_task(self.listen())
 
     async def stop(self):
-        self._listening_task.cancel()
+        await self._queue.join()
+        canceled = False
+        while not canceled:
+            canceled = self._listening_task.cancel()
         LOGGER.info("Signal subscriber stopped.")
 
     async def __aenter__(self):
