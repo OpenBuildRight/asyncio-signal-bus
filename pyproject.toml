@@ -4,11 +4,16 @@ version = "0.1.0"
 description = ""
 authors = ["DustinMoriarty <dustin.moriarty@protonmail.com>"]
 readme = "README.md"
-packages = [{include = "asyncio_signal_bus"}]
+packages = [{include = "asyncio_signal_bus", from="src"}]
 
 [tool.poetry.dependencies]
 python = "^3.9"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.7.0"
+flake8 = "^6.1.0"
 
 [build-system]
 requires = ["poetry-core"]
