@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "asyncio-signal-bus"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["DustinMoriarty <dustin.moriarty@protonmail.com>"]
 readme = "README.md"
