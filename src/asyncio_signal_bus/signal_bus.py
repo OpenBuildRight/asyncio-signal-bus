@@ -4,7 +4,7 @@ from collections.abc import Callable
 from logging import getLogger
 from typing import Any, Awaitable, Dict, List, TypeVar
 
-from asyncio_signal_bus.ErrorHandler import SubscriberErrorHandler
+from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.publisher import SignalPublisher
 from asyncio_signal_bus.subscriber import SignalSubscriber
 
