@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "asyncio-signal-bus"
+version = "0.1.0"
+description = ""
+authors = ["DustinMoriarty <dustin.moriarty@protonmail.com>"]
+readme = "README.md"
+packages = [{include = "asyncio_signal_bus", from="src"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.7.0"
+flake8 = "^6.1.0"
+pytest-asyncio = "^0.21.1"
+isort = "^5.12.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+src_paths = ["src", "tests"]
