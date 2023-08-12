@@ -1,8 +1,7 @@
 import asyncio
 from asyncio import Queue
-from typing import Generic, Callable, Awaitable, TypeVar
-
 from logging import getLogger
+from typing import Awaitable, Callable, Generic, TypeVar
 
 LOGGER = getLogger(__name__)
 S = TypeVar("S")
@@ -26,6 +25,7 @@ class SignalSubscriber(Generic[S, R]):
         LOGGER.info("Starting signal subscriber")
         if self._listening_task is None:
             self._listening_task = asyncio.create_task(self.listen())
+
     async def stop(self):
         self._listening_task.cancel()
         LOGGER.info("Signal subscriber stopped.")

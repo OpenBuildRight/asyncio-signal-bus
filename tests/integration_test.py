@@ -1,12 +1,12 @@
 import asyncio
 import logging
-from logging import getLogger, StreamHandler
 import sys
+from asyncio.queues import Queue
+from logging import StreamHandler
 
 import pytest
 
 from asyncio_signal_bus import SignalBus
-from asyncio.queues import Queue
 
 
 @pytest.mark.asyncio
@@ -17,6 +17,7 @@ async def test_round_trip():
     handler.setLevel("DEBUG")
     bus = SignalBus()
     result_queue = Queue()
+
     @bus.publisher(topic_name="foo")
     async def foo_publisher(arg: str):
         print("Publishing message.")
@@ -26,6 +27,7 @@ async def test_round_trip():
     async def foo_subscriber(signal: str):
         print("Received message.")
         await result_queue.put(signal)
+
     input = ["a", "b", "c"]
     expected_output = ["message:a", "message:b", "message:c"]
 
@@ -36,4 +38,3 @@ async def test_round_trip():
         results.append(await result_queue.get())
     results.sort()
     assert expected_output == results
-

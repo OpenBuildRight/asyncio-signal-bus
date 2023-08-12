@@ -1,13 +1,12 @@
 import asyncio
-from collections.abc import Callable
-from typing import Dict
 from asyncio.queues import Queue
-from typing import Any, Awaitable, TypeVar, List
+from collections.abc import Callable
 from logging import getLogger
+from typing import Any, Awaitable, Dict, List, TypeVar
 
+from asyncio_signal_bus.ErrorHandler import SubscriberErrorHandler
 from asyncio_signal_bus.publisher import SignalPublisher
 from asyncio_signal_bus.subscriber import SignalSubscriber
-from asyncio_signal_bus.ErrorHandler import SubscriberErrorHandler
 
 LOGGER = getLogger(__name__)
 
@@ -27,24 +26,22 @@ class SignalBus:
     def subscriber(self, topic_name="default", error_handler=SubscriberErrorHandler):
         self._queues.setdefault(topic_name, Queue())
         queue = self._queues.get(topic_name)
+
         def _wrapper(f: Callable[[Any], Awaitable[Any]]):
-            s = SignalSubscriber(
-               error_handler(f),
-               queue
-            )
+            s = SignalSubscriber(error_handler(f), queue)
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
             return s
+
         return _wrapper
 
     def publisher(self, topic_name="default"):
         self._queues.setdefault(topic_name, Queue())
         queue = self._queues.get(topic_name)
+
         def _wrapper(f: Callable[[Any], Awaitable[Any]]):
-            return SignalPublisher(
-                f,
-                queue
-            )
+            return SignalPublisher(f, queue)
+
         return _wrapper
 
     async def __aenter__(self):
