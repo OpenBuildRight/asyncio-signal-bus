@@ -49,4 +49,4 @@ class SignalBus:
         await asyncio.gather(*[x.start() for x in self._subscribers])
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await asyncio.gather(*[x.start() for x in self._subscribers])
+        await asyncio.gather(*[x.stop() for x in self._subscribers])
