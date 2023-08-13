@@ -14,6 +14,8 @@ jobs:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     steps:
     # retrieve your distributions here
+    - name: Checkout code
+      uses: actions/checkout@v2
     - name: Install Poetry
       run: |
         curl -sSL https://install.python-poetry.org | python - -y
