@@ -1,15 +1,16 @@
 from logging import getLogger
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable, Generic
+from asyncio_signal_bus.types import S, R
 
 LOGGER = getLogger(__name__)
 
 
-class SubscriberErrorHandler:
-    def __init__(self, callable: Callable[[Any], Awaitable]):
-        self._callable = callable
+class SubscriberErrorHandler(Generic[S, R]):
+    def __init__(self, f: Callable[[S], Awaitable[R]]):
+        self._f = f
 
-    def __call__(self, signal: Any):
+    def __call__(self, signal: S) -> R:
         try:
-            return self._callable(signal)
+            return self._f(signal)
         except Exception as e:
             LOGGER.exception(f"An error occurred in a subscriber. {repr(e)}")
