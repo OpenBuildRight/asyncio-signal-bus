@@ -9,8 +9,6 @@ jobs:
   unit-test:
     name: unit test
     runs-on: ubuntu-latest
-    environment:
-      name: test
     steps:
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
