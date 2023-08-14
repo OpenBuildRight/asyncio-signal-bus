@@ -22,10 +22,10 @@ jobs:
     - name: install package
       run: poetry install
     - name: pytest
-      run: poetry run -m pytest
+      run: poetry run pytest
     - name: black
-      run: poetry run -m black --check .
+      run: poetry run black --check .
     - name: isort
-      run: poetry run -m isort -c .
+      run: poetry run isort -c .
     - name: flake8
       run: poetry run flake8
