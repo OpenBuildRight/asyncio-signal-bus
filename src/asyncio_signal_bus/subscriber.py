@@ -3,13 +3,10 @@ from asyncio import Queue, Task
 from logging import getLogger
 from typing import Awaitable, Callable, Generic, Optional, SupportsFloat
 
+from asyncio_signal_bus.exception import SignalBusShutdownError
 from asyncio_signal_bus.types import R, S
 
 LOGGER = getLogger(__name__)
-
-
-class SignalBusShutdownError(Exception):
-    ...
 
 
 class SignalSubscriber(Generic[S, R]):
@@ -32,7 +29,7 @@ class SignalSubscriber(Generic[S, R]):
         await coroutine
         self._queue.task_done()
 
-    async def listen(self):
+    async def _listen(self):
         LOGGER.debug("Started listening.")
         while True:
             signal = await self._queue.get()
@@ -45,20 +42,23 @@ class SignalSubscriber(Generic[S, R]):
         """
         LOGGER.debug("Starting signal subscriber")
         if self._listening_task is None:
-            self._listening_task = asyncio.create_task(self.listen())
+            self._listening_task = asyncio.create_task(self._listen())
 
     async def stop(self):
         """
         Stop the subscriber.
         """
-        await asyncio.wait_for(self._queue.join(), timeout=self.shutdown_timeout)
-        if self._queue.qsize():
+        try:
+            await asyncio.wait_for(self._queue.join(), timeout=self.shutdown_timeout)
+        except asyncio.exceptions.TimeoutError as e:
             raise SignalBusShutdownError(
-                f"Unable to shutdown {self._queue} tasks in queue within timeout of "
-                f"{self.shutdown_timeout} seconds."
+                f"Unable to shutdown tasks in the queue within timeout of"
+                f"{self.shutdown_timeout} seconds. "
+                f"The timeout can be adjusted with the shutdown timeout parameter if "
+                f"you need the task to have more time. {repr(e)}"
             )
-        canceled = False
         LOGGER.debug("All tasks have completed.")
+        canceled = False
         while not canceled:
             canceled = self._listening_task.cancel()
         LOGGER.debug("Signal subscriber stopped.")

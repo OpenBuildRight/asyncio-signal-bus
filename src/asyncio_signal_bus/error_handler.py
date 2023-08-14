@@ -7,6 +7,10 @@ LOGGER = getLogger(__name__)
 
 
 class SubscriberErrorHandler(Generic[S, R]):
+    """
+    Error handler for subscribers. This class may be subclassed if more complex error
+    handling is needed. However, generally, all errors should terminate here.
+    """
     def __init__(self, f: Callable[[S], Awaitable[R]]):
         self._f = f
 

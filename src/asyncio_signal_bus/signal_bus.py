@@ -1,7 +1,7 @@
 import asyncio
 from asyncio.queues import Queue
 from logging import getLogger
-from typing import Awaitable, Callable, Dict, List, Type
+from typing import Awaitable, Callable, Dict, List, Type, SupportsFloat, Optional
 
 from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.publisher import SignalPublisher
@@ -65,6 +65,7 @@ class SignalBus:
         self,
         topic_name="default",
         error_handler: Type[SubscriberErrorHandler] = SubscriberErrorHandler[S, R],
+        shutdown_timeout: Optional[SupportsFloat] = 120
     ) -> Callable[[Callable[[S], Awaitable[R]]], SignalSubscriber[S, R]]:
         """
         Decorator for asyncio methods subscribing to a topic. The method must take a
@@ -76,6 +77,9 @@ class SignalBus:
             Error handling should usually terminate at the subscriber, with the
             subscriber catching all exceptions. Any unhandled errors will block the
             shutdown of the bus when the bus exits context or the stop method is used.
+        :param shutdown_timeout: If the subscriber takes longer than this time during
+            shutdown, then the task is killed and an error is raised. If you do not
+            want the task timeout to be limited, then set this value to None.
         :return: Wrapped callable.
         """
         self._queues.setdefault(topic_name, [])
@@ -117,7 +121,9 @@ class SignalBus:
         processed as soon as the bus is started. You must remember to stop the bus
         during shutdown yourself.
         """
+        LOGGER.debug("Starting bus.")
         await asyncio.gather(*[x.start() for x in self._subscribers])
+        LOGGER.debug("Bus started.")
 
     async def stop(self):
         """
@@ -128,7 +134,9 @@ class SignalBus:
         subscribers are guaranteed to complete.
         :return:
         """
+        LOGGER.debug("Stopping bus.")
         await asyncio.gather(*[x.stop() for x in self._subscribers])
+        LOGGER.debug("Bus stopped.")
 
     async def __aenter__(self):
         await self.start()
