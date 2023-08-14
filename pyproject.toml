@@ -1,14 +1,13 @@
 [tool.poetry]
 name = "asyncio-signal-bus"
 version = "1.1.0"
-description = ""
+description = "Internal application publisher/subscriber bus using asyncio queues."
 authors = ["DustinMoriarty <dustin.moriarty@protonmail.com>"]
 readme = "README.md"
 packages = [{include = "asyncio_signal_bus", from="src"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
