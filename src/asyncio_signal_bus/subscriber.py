@@ -3,19 +3,26 @@ from asyncio import Queue, Task
 from logging import getLogger
 from typing import Awaitable, Callable, Generic, Optional, SupportsFloat
 
-from asyncio_signal_bus.types import S, R
+from asyncio_signal_bus.types import R, S
 
 LOGGER = getLogger(__name__)
 
-class SignalBusShutdownError(Exception):...
+
+class SignalBusShutdownError(Exception):
+    ...
+
 
 class SignalSubscriber(Generic[S, R]):
     """
     Wrapper class used to subscribe an async callable to an asyncio queue.
     """
 
-    def __init__(self, f: Callable[[S], Awaitable[R]], queue: Queue,
-                 shutdown_timeout: SupportsFloat = 120):
+    def __init__(
+        self,
+        f: Callable[[S], Awaitable[R]],
+        queue: Queue,
+        shutdown_timeout: SupportsFloat = 120,
+    ):
         self._f = f
         self._queue: Queue = queue
         self._listening_task: Optional[Task] = None

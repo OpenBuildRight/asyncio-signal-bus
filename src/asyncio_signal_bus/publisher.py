@@ -1,6 +1,7 @@
 import asyncio
 from asyncio import Queue
-from typing import Awaitable, Callable, List, Generic
+from typing import Awaitable, Callable, Generic, List
+
 from asyncio_signal_bus.types import R
 
 

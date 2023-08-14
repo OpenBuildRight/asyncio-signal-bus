@@ -1,6 +1,7 @@
 from logging import getLogger
 from typing import Awaitable, Callable, Generic
-from asyncio_signal_bus.types import S, R
+
+from asyncio_signal_bus.types import R, S
 
 LOGGER = getLogger(__name__)
 

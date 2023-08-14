@@ -1,12 +1,12 @@
 import asyncio
 from asyncio.queues import Queue
 from logging import getLogger
-from typing import Awaitable, Dict, List, Callable, Type
+from typing import Awaitable, Callable, Dict, List, Type
 
 from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.publisher import SignalPublisher
 from asyncio_signal_bus.subscriber import SignalSubscriber
-from asyncio_signal_bus.types import S, R
+from asyncio_signal_bus.types import R, S
 
 LOGGER = getLogger(__name__)
 
