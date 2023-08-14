@@ -1,7 +1,7 @@
 import asyncio
 from asyncio.queues import Queue
 from logging import getLogger
-from typing import Awaitable, Callable, Dict, List, Type, SupportsFloat, Optional
+from typing import Awaitable, Callable, Dict, List, Optional, SupportsFloat, Type
 
 from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.publisher import SignalPublisher
@@ -65,7 +65,7 @@ class SignalBus:
         self,
         topic_name="default",
         error_handler: Type[SubscriberErrorHandler] = SubscriberErrorHandler[S, R],
-        shutdown_timeout: Optional[SupportsFloat] = 120
+        shutdown_timeout: Optional[SupportsFloat] = 120,
     ) -> Callable[[Callable[[S], Awaitable[R]]], SignalSubscriber[S, R]]:
         """
         Decorator for asyncio methods subscribing to a topic. The method must take a
