@@ -71,6 +71,40 @@ async def test_round_trip_with_classes():
     results.sort()
     assert expected_output == results
 
+@pytest.mark.asyncio
+async def test_round_trip_in_same_class():
+    result_queue = Queue()
+
+    class FooPublisher:
+        bus = SignalBus()
+
+        def __init__(self):
+            self.foo_subscriber = self.bus.subscriber(topic_name="foo")(self.foo_subscriber)
+            self.foo_publisher = self.bus.publisher(topic_name="foo")(self.foo_publisher)
+
+        async def foo_publisher(self, arg: str):
+            print("Publishing message.")
+            await asyncio.sleep(1)
+            return f"message:{arg}"
+
+        async def foo_subscriber(self, signal: str):
+            print("Received message.")
+            await asyncio.sleep(1)
+            await result_queue.put(signal)
+
+    input = ["a", "b", "c"]
+    expected_output = ["message:a", "message:b", "message:c"]
+
+    foo_publisher = FooPublisher()
+
+    async with foo_publisher.bus:
+        await asyncio.gather(*[foo_publisher.foo_publisher(x) for x in input])
+    results = []
+    while not result_queue.empty():
+        results.append(await result_queue.get())
+    results.sort()
+    assert expected_output == results
+
 
 @pytest.mark.asyncio
 async def test_chaining():
