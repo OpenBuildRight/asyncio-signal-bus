@@ -1,0 +1,26 @@
+on:
+  push:
+
+jobs:
+  unit-test:
+    name: Unit test
+    runs-on: ubuntu-latest
+    environment:
+      name: test
+    steps:
+    # retrieve your distributions here
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python - -y
+    - name: Install package
+      run: poetry install
+    - name: pytest
+      run: pytest
+    - name: black
+      run: black --check .
+    - name: isort
+      run: isort -c .
+    - name: flake8
+      run: flake8
