@@ -10,6 +10,7 @@ from asyncio_signal_bus.queue_getter import QueueGetter
 async def test_signal_publisher():
     async def foo_publisher(arg: str):
         return arg.upper()
+
     queues = {}
     queue_getter = QueueGetter("foo", queues)
 

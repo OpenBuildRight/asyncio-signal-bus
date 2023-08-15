@@ -1,9 +1,8 @@
 import asyncio
-from asyncio import Queue
-from typing import Awaitable, Callable, Generic, List
+from typing import Awaitable, Callable, Generic
 
-from asyncio_signal_bus.types import R
 from asyncio_signal_bus.queue_getter import QueueGetter
+from asyncio_signal_bus.types import R
 
 
 class SignalPublisher(Generic[R]):
