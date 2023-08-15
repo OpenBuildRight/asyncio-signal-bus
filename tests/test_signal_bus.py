@@ -47,14 +47,14 @@ async def test_round_trip_with_classes():
         @bus.publisher(topic_name="foo")
         async def foo_publisher(arg: str):
             print("Publishing message.")
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
             return f"message:{arg}"
 
     class FooSubscriber:
         @bus.subscriber(topic_name="foo")
         async def foo_subscriber(signal: str):
             print("Received message.")
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
             await result_queue.put(signal)
 
     input = ["a", "b", "c"]
@@ -89,12 +89,12 @@ async def test_round_trip_in_same_class():
 
         async def foo_publisher(self, arg: str):
             print("Publishing message.")
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.01)
             return f"message:{arg}"
 
         async def foo_subscriber(self, signal: str):
             print("Received message.")
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.01)
             await result_queue.put(signal)
 
     input = ["a", "b", "c"]
@@ -123,7 +123,7 @@ async def test_chaining():
     @bus.publisher(topic_name="bar")
     async def bar_publisher(arg: str):
         print("Publishing message.")
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.2)
         return f"message:{arg}"
 
     @bus.subscriber(topic_name="bar")
@@ -134,7 +134,7 @@ async def test_chaining():
     @bus.subscriber(topic_name="foo")
     async def foo_subscriber(signal: str):
         print("Received message.")
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.2)
         await result_queue.put(signal)
 
     input = ["a", "b", "c"]
