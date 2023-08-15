@@ -2,9 +2,9 @@ import pytest
 
 from asyncio_signal_bus.injector import Injector
 
+
 @pytest.mark.asyncio
 async def test_injector():
-
     INJECTOR = Injector()
 
     async def foo_factory():
@@ -12,6 +12,7 @@ async def test_injector():
 
     async def bar_factory():
         return "BAR"
+
     @INJECTOR.inject("foo", foo_factory)
     @INJECTOR.inject("bar", bar_factory)
     async def foobar(foo=None, bar=None):
@@ -25,7 +26,6 @@ async def test_injector():
 
 @pytest.mark.asyncio
 async def test_nested_injector():
-
     INJECTOR = Injector()
 
     async def foo_factory():
@@ -40,7 +40,6 @@ async def test_nested_injector():
         ret = {} if foo_dict is None else foo_dict
         ret["bar"] = "BAR"
         return ret
-
 
     assert {"bar": "BAR"} == await foobar()
 

@@ -1,6 +1,6 @@
 import asyncio
-from typing import Dict, Callable, Awaitable, TypeVar, Generic, List, Any
 from asyncio.locks import Lock
+from typing import Awaitable, Callable, Generic, List, TypeVar
 
 R = TypeVar("R")
 
@@ -35,6 +35,7 @@ class Injector:
     With context:
     {"foo": "FOO", "bar": "BAR"}
     """
+
     def __init__(self):
         self._injector_callables: List[InjectorCallable] = []
         self._injector_callables_lock = Lock()
@@ -44,6 +45,7 @@ class Injector:
             injector_callable = InjectorCallable(f, arg_name, factory)
             self._injector_callables.append(injector_callable)
             return injector_callable
+
         return _inject
 
     async def start(self):
@@ -61,10 +63,13 @@ class Injector:
         await self.stop()
 
 
-
 class InjectorCallable(Generic[R]):
-
-    def __init__(self, f: Callable[..., Awaitable[R]], arg_name: str, factory: Callable[..., Awaitable]):
+    def __init__(
+        self,
+        f: Callable[..., Awaitable[R]],
+        arg_name: str,
+        factory: Callable[..., Awaitable],
+    ):
         self._in_context = False
         self._in_context_lock = Lock()
         self._f = f
@@ -85,4 +90,3 @@ class InjectorCallable(Generic[R]):
             _kwargs[self.arg_name] = await self.factory()
         _kwargs.update(kwargs)
         return await self._f(*args, **_kwargs)
-

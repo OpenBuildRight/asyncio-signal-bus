@@ -54,7 +54,7 @@ class SignalBus:
     HELLO FROM WORLD!
     """
 
-    def __init__(self, injector = None):
+    def __init__(self, injector=None):
         self._queues: Dict[str, List[Queue]] = {}
         self._subscribers: List[SignalSubscriber] = []
         self.injector = injector if injector else Injector()
@@ -164,7 +164,9 @@ class SignalBus:
         during shutdown yourself.
         """
         LOGGER.debug("Starting bus.")
-        await asyncio.gather(self.injector.start(), *[x.start() for x in self._subscribers])
+        await asyncio.gather(
+            self.injector.start(), *[x.start() for x in self._subscribers]
+        )
         LOGGER.debug("Bus started.")
 
     async def stop(self):
@@ -177,7 +179,9 @@ class SignalBus:
         :return:
         """
         LOGGER.debug("Stopping bus.")
-        await asyncio.gather(self.injector.stop(), *[x.stop() for x in self._subscribers])
+        await asyncio.gather(
+            self.injector.stop(), *[x.stop() for x in self._subscribers]
+        )
         LOGGER.debug("Bus stopped.")
 
     async def __aenter__(self):

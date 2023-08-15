@@ -12,7 +12,7 @@ pip install asyncio-signal-bus
 ```
 
 ## Usage
-Simply annotate your publishers and subscribers to pass any data type asynchronously 
+Simply decorate your publishers and subscribers to pass any data type asynchronously 
 whenever the publisher returns a value. 
 
 ```python
@@ -52,3 +52,31 @@ That is it! You can string together publishers and subscribers in whatever way y
 You can also annotate functions and methods used for other purposes as publishers in 
 order to facilitate post processing and reporting hooks without having to pass them 
 to the function.
+
+## Dependency Injection
+Subscribers often need additional data beyond the signal, such as URL's, secrets, 
+usernames and connection pools. The inject decorator can be used to inject additional 
+data to other arguments as kwargs defaults. Injection only occors when the bus or it's 
+injector is within context.
+```python
+import asyncio
+
+from asyncio_signal_bus import SignalBus
+BUS = SignalBus()
+
+@BUS.publisher(topic_name="greeting")
+async def generate_greeting(arg: str):
+    return arg
+
+async def name_factory():
+     return "Frank"
+
+@BUS.subscriber(topic_name="greeting")
+@BUS.inject("name", name_factory)
+async def print_greeting(greeting: str, name: str):
+    print(f"{greeting} from {name}")
+async def main():
+    async with BUS:
+        await generate_greeting("hello")
+asyncio.run(main())
+```
