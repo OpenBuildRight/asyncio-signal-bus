@@ -69,5 +69,5 @@ class SignalSubscriber(Generic[S, R]):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.stop()
 
-    async def __call__(self, signal: S) -> R:
-        return await self._f(signal)
+    async def __call__(self, signal: S, *args, **kwargs) -> R:
+        return await self._f(signal, *args, **kwargs)

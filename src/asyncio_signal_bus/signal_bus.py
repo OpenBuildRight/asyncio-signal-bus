@@ -4,6 +4,7 @@ from logging import getLogger
 from typing import Awaitable, Callable, Dict, List, Optional, SupportsFloat, Type
 
 from asyncio_signal_bus.error_handler import SubscriberErrorHandler
+from asyncio_signal_bus.injector import Injector
 from asyncio_signal_bus.publisher import SignalPublisher
 from asyncio_signal_bus.subscriber import SignalSubscriber
 from asyncio_signal_bus.types import R, S
@@ -53,10 +54,10 @@ class SignalBus:
     HELLO FROM WORLD!
     """
 
-    def __init__(self):
+    def __init__(self, injector = None):
         self._queues: Dict[str, List[Queue]] = {}
         self._subscribers: List[SignalSubscriber] = []
-        self._publishers = []
+        self.injector = injector if injector else Injector()
 
     def get_queue(self, queue_name: str) -> List[Queue]:
         return self._queues.get(queue_name)
@@ -113,6 +114,47 @@ class SignalBus:
 
         return _wrapper
 
+    def inject(self, arg_name: str, factory: Callable[..., Awaitable]):
+        """
+        Decorator used to inject the argument arg_name using the return value of the
+        coroutine factory if the SignalBus is within context. Inject uses an
+        instance of the Inject class which tracks the same context as the
+        SignalBus for convenience. Injectors are usually needed in subscribers which
+        need additional data, such as URL's, secrets and usernames and connection pools
+        not received in the signal.
+
+        >>> BUS = SignalBus()
+
+        >>> @BUS.publisher(topic_name="greeting")
+        ... async def generate_greeting(arg: str):
+        ...     return arg
+
+        >>> async def name_factory():
+        ...     return "Frank"
+
+        >>> @BUS.subscriber(topic_name="greeting")
+        ... @BUS.inject("name", name_factory)
+        ... async def print_greeting(greeting: str, name: str):
+        ...     print(f"{greeting} from {name}")
+        >>> async def main():
+        ...     async with BUS:
+        ...         await generate_greeting("hello")
+        >>> asyncio.run(main())
+        hello from Frank
+
+        Note that, while the injector is wrapped in the bus for convenience, you do not
+        need to use the bus to use the injector. The Injector is a stand-alone class
+        that can be used without the SignalBus. In addition, you can decorate things
+        other than publishers and subscribers. The Injector can take the place of the
+        web framework's dependency injector so that the same injector system can be
+        used accross multiple protocols.
+
+        :param arg_name: THe name of the argument to inject into the method.
+        :param factory:
+        :return:
+        """
+        return self.injector.inject(arg_name, factory)
+
     async def start(self):
         """
         Start the signal bus. This is used in cases where it is not practical
@@ -122,7 +164,7 @@ class SignalBus:
         during shutdown yourself.
         """
         LOGGER.debug("Starting bus.")
-        await asyncio.gather(*[x.start() for x in self._subscribers])
+        await asyncio.gather(self.injector.start(), *[x.start() for x in self._subscribers])
         LOGGER.debug("Bus started.")
 
     async def stop(self):
@@ -135,7 +177,7 @@ class SignalBus:
         :return:
         """
         LOGGER.debug("Stopping bus.")
-        await asyncio.gather(*[x.stop() for x in self._subscribers])
+        await asyncio.gather(self.injector.stop(), *[x.stop() for x in self._subscribers])
         LOGGER.debug("Bus stopped.")
 
     async def __aenter__(self):
