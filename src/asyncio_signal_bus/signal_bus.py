@@ -6,6 +6,7 @@ from typing import Awaitable, Callable, Dict, List, Optional, SupportsFloat, Typ
 from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.injector import Injector
 from asyncio_signal_bus.publisher import SignalPublisher
+from asyncio_signal_bus.queue_getter import QueueGetter
 from asyncio_signal_bus.subscriber import SignalSubscriber
 from asyncio_signal_bus.types import R, S
 
@@ -106,11 +107,10 @@ class SignalBus:
             with one or more publishers.
         :return: wrapped callable
         """
-        self._queues.setdefault(topic_name, [])
-        queues = self._queues.get(topic_name)
+        queue_getter = QueueGetter(topic_name, self._queues)
 
         def _wrapper(f: Callable[..., Awaitable[S]]) -> SignalPublisher[S]:
-            return SignalPublisher(f, queues)
+            return SignalPublisher(f, queue_getter)
 
         return _wrapper
 
