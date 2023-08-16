@@ -7,7 +7,7 @@ from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.injector import Injector
 from asyncio_signal_bus.publisher import SignalPublisher
 from asyncio_signal_bus.queue_getter import QueueGetter
-from asyncio_signal_bus.subscriber import SignalSubscriber, BatchSignalSubscriber
+from asyncio_signal_bus.subscriber import BatchSignalSubscriber, SignalSubscriber
 from asyncio_signal_bus.types import R, S
 
 LOGGER = getLogger(__name__)

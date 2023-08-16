@@ -1,11 +1,11 @@
 import asyncio
 from asyncio import Queue, Task
 from logging import getLogger
+from time import time
 from typing import Awaitable, Callable, Generic, Optional, SupportsFloat, SupportsInt
 
 from asyncio_signal_bus.exception import SignalBusShutdownError
 from asyncio_signal_bus.types import R, S
-from time import time
 
 LOGGER = getLogger(__name__)
 

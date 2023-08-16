@@ -5,7 +5,7 @@ from unittest.mock import Mock, call
 import pytest
 
 from asyncio_signal_bus.exception import SignalBusShutdownError
-from asyncio_signal_bus.subscriber import SignalSubscriber, BatchSignalSubscriber
+from asyncio_signal_bus.subscriber import BatchSignalSubscriber, SignalSubscriber
 
 
 @pytest.mark.asyncio
