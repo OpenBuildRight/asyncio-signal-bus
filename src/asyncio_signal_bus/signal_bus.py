@@ -7,7 +7,7 @@ from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.injector import Injector
 from asyncio_signal_bus.publisher import SignalPublisher
 from asyncio_signal_bus.queue_getter import QueueGetter
-from asyncio_signal_bus.subscriber import SignalSubscriber
+from asyncio_signal_bus.subscriber import SignalSubscriber, BatchSignalSubscriber
 from asyncio_signal_bus.types import R, S
 
 LOGGER = getLogger(__name__)
@@ -89,7 +89,52 @@ class SignalBus:
         self._queues.get(topic_name).append(queue)
 
         def _wrapper(f: Callable[[S], Awaitable[R]]) -> SignalSubscriber[S, R]:
-            s = SignalSubscriber(error_handler(f), queue)
+            s = SignalSubscriber(
+                error_handler(f), queue, shutdown_timeout=shutdown_timeout
+            )
+            LOGGER.debug(f"Registering subscriber to topic {topic_name}")
+            self._subscribers.append(s)
+            return s
+
+        return _wrapper
+
+    def batch_subscriber(
+        self,
+        topic_name="default",
+        error_handler: Type[SubscriberErrorHandler] = SubscriberErrorHandler[S, R],
+        shutdown_timeout: Optional[SupportsFloat] = 120,
+        max_items: int = 10,
+        period_seconds: int = 10,
+    ):
+        """
+        A subscriber that consumes batches of events. The subscriber will wait no longer
+        than the period_seconds between aggregations. Batches will not exceed batch
+        seconds in size.
+        :param topic_name: The name of the topic used to link one or more subscribers
+            with one or more publishers.
+        :param error_handler: An error handler used to handle errors within the callable.
+            Error handling should usually terminate at the subscriber, with the
+            subscriber catching all exceptions. Any unhandled errors will block the
+            shutdown of the bus when the bus exits context or the stop method is used.
+        :param shutdown_timeout: If the subscriber takes longer than this time during
+            shutdown, then the task is killed and an error is raised. If you do not
+            want the task timeout to be limited, then set this value to None.
+        :param max_items: The maximum amount of time for the batch.
+        :param period_seconds: The maximum amount of timem to wait between batches.
+        :return: Wrapped callable
+        """
+        self._queues.setdefault(topic_name, [])
+        queue = Queue()
+        self._queues.get(topic_name).append(queue)
+
+        def _wrapper(f: Callable[[S], Awaitable[R]]) -> SignalSubscriber[S, R]:
+            s = BatchSignalSubscriber(
+                error_handler(f),
+                queue,
+                shutdown_timeout=shutdown_timeout,
+                max_items=max_items,
+                period_seconds=period_seconds,
+            )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
             return s
