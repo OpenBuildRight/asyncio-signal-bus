@@ -1,7 +1,8 @@
 import asyncio
 from asyncio import Queue, Task
 from logging import getLogger
-from typing import Awaitable, Callable, Generic, Optional, SupportsFloat
+from time import time
+from typing import Awaitable, Callable, Generic, Optional, SupportsFloat, SupportsInt
 
 from asyncio_signal_bus.exception import SignalBusShutdownError
 from asyncio_signal_bus.types import R, S
@@ -71,3 +72,42 @@ class SignalSubscriber(Generic[S, R]):
 
     async def __call__(self, signal: S, *args, **kwargs) -> R:
         return await self._f(signal, *args, **kwargs)
+
+
+class BatchSignalSubscriber(SignalSubscriber):
+    def __init__(
+        self,
+        f: Callable[[S], Awaitable[R]],
+        queue: Queue,
+        shutdown_timeout: SupportsFloat = 120,
+        max_items: SupportsInt = 10,
+        period_seconds: SupportsFloat = 10,
+    ):
+        super().__init__(f, queue, shutdown_timeout)
+        self.max_items = int(max_items)
+        self.period_seconds = float(period_seconds)
+
+    async def _batch_task_wrapper(self, coroutine, n_items: int):
+        await coroutine
+        for i in range(n_items):
+            self._queue.task_done()
+
+    async def _listen(self):
+        LOGGER.debug("Started listening.")
+        batch = []
+        ts = time()
+        while True:
+            if len(batch) < self.max_items and not self._queue.empty():
+                signal = self._queue.get_nowait()
+                batch.append(signal)
+            if batch and (
+                len(batch) >= self.max_items or (time() - ts) > self.period_seconds
+            ):
+                asyncio.create_task(self._batch_task_wrapper(self(batch), len(batch)))
+                ts = time()
+                batch = []
+            # This deadlocks unless there is some sleep. It does not need to be long.
+            # My guess is that under the hood we just need to allow at least one clock
+            # cycle for something else to happen so that the event loop can perform
+            # other operations.
+            await asyncio.sleep(1e-10)
