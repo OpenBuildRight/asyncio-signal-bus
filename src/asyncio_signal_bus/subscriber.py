@@ -20,11 +20,14 @@ class SignalSubscriber(Generic[S, R]):
         f: Callable[[S], Awaitable[R]],
         queue: Queue,
         shutdown_timeout: SupportsFloat = 120,
+        back_off_time: SupportsFloat = 0.0001,
     ):
         self._f = f
         self._queue: Queue = queue
+        self._in_context = False
         self._listening_task: Optional[Task] = None
         self.shutdown_timeout: float = float(shutdown_timeout)
+        self.back_off_time: float = float(back_off_time)
 
     async def _task_wrapper(self, coroutine):
         await coroutine
@@ -32,9 +35,12 @@ class SignalSubscriber(Generic[S, R]):
 
     async def _listen(self):
         LOGGER.debug("Started listening.")
-        while True:
+        while self._in_context or not self._queue.empty():
             signal = await self._queue.get()
             asyncio.create_task(self._task_wrapper(self(signal)))
+            if self._queue.empty():
+                await asyncio.sleep(self.back_off_time)
+        LOGGER.debug("Stopped listening.")
 
     async def start(self):
         """
@@ -42,6 +48,7 @@ class SignalSubscriber(Generic[S, R]):
         and stopped manually. Just make sure that you call the method during shutdown.
         """
         LOGGER.debug("Starting signal subscriber")
+        self._in_context = True
         if self._listening_task is None:
             self._listening_task = asyncio.create_task(self._listen())
 
@@ -49,6 +56,7 @@ class SignalSubscriber(Generic[S, R]):
         """
         Stop the subscriber.
         """
+        self._in_context = False
         try:
             await asyncio.wait_for(self._queue.join(), timeout=self.shutdown_timeout)
         except asyncio.exceptions.TimeoutError as e:
@@ -59,9 +67,10 @@ class SignalSubscriber(Generic[S, R]):
                 f"you need the task to have more time. {repr(e)}"
             )
         LOGGER.debug("All tasks have completed.")
-        canceled = False
-        while not canceled:
-            canceled = self._listening_task.cancel()
+
+        while not self._listening_task.done() and not self._listening_task.cancelled():
+            self._listening_task.cancel()
+            await asyncio.sleep(self.shutdown_timeout * 0.001)
         LOGGER.debug("Signal subscriber stopped.")
 
     async def __aenter__(self):
@@ -80,10 +89,17 @@ class BatchSignalSubscriber(SignalSubscriber):
         f: Callable[[S], Awaitable[R]],
         queue: Queue,
         shutdown_timeout: SupportsFloat = 120,
+        back_off_time: SupportsFloat = None,
         max_items: SupportsInt = 10,
         period_seconds: SupportsFloat = 10,
     ):
-        super().__init__(f, queue, shutdown_timeout)
+        if period_seconds > shutdown_timeout:
+            raise ValueError("Period seconds must be less than the shutdown timeout.")
+        if back_off_time and back_off_time > period_seconds:
+            raise ValueError("Backoff time should be less than period_seconds.")
+        if back_off_time is None:
+            back_off_time = float(period_seconds) * 0.25
+        super().__init__(f, queue, shutdown_timeout, back_off_time)
         self.max_items = int(max_items)
         self.period_seconds = float(period_seconds)
 
@@ -96,7 +112,7 @@ class BatchSignalSubscriber(SignalSubscriber):
         LOGGER.debug("Started listening.")
         batch = []
         ts = time()
-        while True:
+        while self._in_context or not self._queue.empty() or batch:
             if len(batch) < self.max_items and not self._queue.empty():
                 signal = self._queue.get_nowait()
                 batch.append(signal)
@@ -106,8 +122,7 @@ class BatchSignalSubscriber(SignalSubscriber):
                 asyncio.create_task(self._batch_task_wrapper(self(batch), len(batch)))
                 ts = time()
                 batch = []
-            # This deadlocks unless there is some sleep. It does not need to be long.
-            # My guess is that under the hood we just need to allow at least one clock
-            # cycle for something else to happen so that the event loop can perform
-            # other operations.
+            if not batch:
+                await asyncio.sleep(self.back_off_time)
             await asyncio.sleep(1e-10)
+        LOGGER.debug("Subscriber stopped.")
