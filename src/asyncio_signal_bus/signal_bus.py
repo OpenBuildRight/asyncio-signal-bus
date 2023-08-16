@@ -68,6 +68,7 @@ class SignalBus:
         topic_name="default",
         error_handler: Type[SubscriberErrorHandler] = SubscriberErrorHandler[S, R],
         shutdown_timeout: Optional[SupportsFloat] = 120,
+        back_off_time: SupportsFloat = 0.1,
     ) -> Callable[[Callable[[S], Awaitable[R]]], SignalSubscriber[S, R]]:
         """
         Decorator for asyncio methods subscribing to a topic. The method must take a
@@ -82,6 +83,8 @@ class SignalBus:
         :param shutdown_timeout: If the subscriber takes longer than this time during
             shutdown, then the task is killed and an error is raised. If you do not
             want the task timeout to be limited, then set this value to None.
+        :param back_off_time: If the queue is empty, wait this long before
+            getting another item.
         :return: Wrapped callable.
         """
         self._queues.setdefault(topic_name, [])
@@ -90,7 +93,10 @@ class SignalBus:
 
         def _wrapper(f: Callable[[S], Awaitable[R]]) -> SignalSubscriber[S, R]:
             s = SignalSubscriber(
-                error_handler(f), queue, shutdown_timeout=shutdown_timeout
+                error_handler(f),
+                queue,
+                shutdown_timeout=shutdown_timeout,
+                back_off_time=back_off_time,
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
@@ -103,8 +109,9 @@ class SignalBus:
         topic_name="default",
         error_handler: Type[SubscriberErrorHandler] = SubscriberErrorHandler[S, R],
         shutdown_timeout: Optional[SupportsFloat] = 120,
+        back_off_time: SupportsFloat = None,
         max_items: int = 10,
-        period_seconds: int = 10,
+        period_seconds: float = 10,
     ):
         """
         A subscriber that consumes batches of events. The subscriber will wait no longer
@@ -119,8 +126,11 @@ class SignalBus:
         :param shutdown_timeout: If the subscriber takes longer than this time during
             shutdown, then the task is killed and an error is raised. If you do not
             want the task timeout to be limited, then set this value to None.
-        :param max_items: The maximum amount of time for the batch.
-        :param period_seconds: The maximum amount of timem to wait between batches.
+        :param back_off_time: If the queue is empty, wait this long before
+            getting another item. If back off time is None, then a default value is
+            calculated from the period_seconds.
+        :param max_items: The maximum amount of items for the batch.
+        :param period_seconds: The maximum amount of time to wait between batches.
         :return: Wrapped callable
         """
         self._queues.setdefault(topic_name, [])
@@ -134,6 +144,7 @@ class SignalBus:
                 shutdown_timeout=shutdown_timeout,
                 max_items=max_items,
                 period_seconds=period_seconds,
+                back_off_time=back_off_time,
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
