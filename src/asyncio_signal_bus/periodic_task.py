@@ -1,18 +1,13 @@
 import asyncio
-from typing import Callable, Any
 from asyncio.locks import Lock
 from logging import getLogger
+from typing import Callable
 
 LOGGER = getLogger(__name__)
 
 
 class PeriodicTask:
-
-    def __init__(
-            self,
-            f: Callable,
-            period_seconds: int = 10
-    ):
+    def __init__(self, f: Callable, period_seconds: int = 10):
         self._f = f
         self._started = False
         self._lock = Lock()

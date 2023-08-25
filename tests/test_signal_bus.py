@@ -193,6 +193,7 @@ async def test_periodic_task():
     BUS = SignalBus()
 
     result = []
+
     @BUS.periodic_task(period_seconds=0.1)
     async def add():
         result.append(1)
@@ -208,6 +209,7 @@ async def test_periodic_task_gracefull_exit():
     BUS = SignalBus()
 
     result = []
+
     @BUS.periodic_task(period_seconds=0.1)
     async def add():
         await asyncio.sleep(0.2)

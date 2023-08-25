@@ -258,10 +258,10 @@ class SignalBus:
             @functools.wraps(f)
             def _inner_wrapper(*args, **kwargs):
                 return periodic_task(*args, **kwargs)
+
             return _inner_wrapper
 
         return wrapper
-
 
     async def start(self):
         """
@@ -289,7 +289,8 @@ class SignalBus:
         """
         LOGGER.debug("Stopping bus.")
         await asyncio.gather(
-            self.injector.stop(), *[x.stop() for x in self._subscribers + self._periodic_tasks]
+            self.injector.stop(),
+            *[x.stop() for x in self._subscribers + self._periodic_tasks],
         )
         LOGGER.debug("Bus stopped.")
 
