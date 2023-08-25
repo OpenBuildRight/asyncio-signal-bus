@@ -10,7 +10,7 @@ class PeriodicTask:
 
     def __init__(
             self,
-            f: Callable[[], Any],
+            f: Callable,
             period_seconds: int = 10
     ):
         self._f = f
@@ -21,6 +21,7 @@ class PeriodicTask:
     async def periodic_task(self):
         while self._started:
             async with self._lock:
+                LOGGER.debug("Executing periodic task.")
                 await self._f()
             await asyncio.sleep(self.period_seconds)
 
@@ -31,7 +32,8 @@ class PeriodicTask:
 
     async def stop(self):
         self._started = False
-        async with self._lock.acquire():
+        LOGGER.debug("Waiting for periodic task to stop.")
+        async with self._lock:
             LOGGER.debug("Periodic task stopped.")
 
     async def __aenter__(self):
@@ -39,3 +41,6 @@ class PeriodicTask:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.stop()
+
+    async def __call__(self, *args, **kwargs):
+        return self._f(*args, **kwargs)

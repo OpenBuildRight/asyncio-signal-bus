@@ -6,6 +6,7 @@ from typing import Awaitable, Callable, Dict, List, Optional, SupportsFloat, Typ
 
 from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.injector import Injector
+from asyncio_signal_bus.periodic_task import PeriodicTask
 from asyncio_signal_bus.publisher import SignalPublisher
 from asyncio_signal_bus.queue_getter import QueueGetter
 from asyncio_signal_bus.subscriber import BatchSignalSubscriber, SignalSubscriber
@@ -60,6 +61,7 @@ class SignalBus:
         self._queues: Dict[str, List[Queue]] = {}
         self._subscribers: List[SignalSubscriber] = []
         self.injector = injector if injector else Injector()
+        self._periodic_tasks = []
 
     def get_queue(self, queue_name: str) -> List[Queue]:
         return self._queues.get(queue_name)
@@ -226,6 +228,41 @@ class SignalBus:
         """
         return self.injector.inject(arg_name, factory)
 
+    def periodic_task(self, period_seconds: int = 10):
+        """
+        Create a periodic task.
+
+        >>> BUS = SignalBus()
+        >>> @BUS.periodic_task(period_seconds=0.5)
+        ... async def print_foos():
+        ...     print("foo")
+        >>> async def main():
+        ...     async with BUS:
+        ...         await asyncio.sleep(2)
+        >>> asyncio.run(main())
+        foo
+        foo
+        foo
+        foo
+
+        The task will block exiting the bus context until it has completed.
+
+        :param period_seconds:
+        :return: Wrapped callable
+        """
+
+        def wrapper(f):
+            periodic_task = PeriodicTask(f, period_seconds=period_seconds)
+            self._periodic_tasks.append(periodic_task)
+
+            @functools.wraps(f)
+            def _inner_wrapper(*args, **kwargs):
+                return periodic_task(*args, **kwargs)
+            return _inner_wrapper
+
+        return wrapper
+
+
     async def start(self):
         """
         Start the signal bus. This is used in cases where it is not practical
@@ -236,7 +273,8 @@ class SignalBus:
         """
         LOGGER.debug("Starting bus.")
         await asyncio.gather(
-            self.injector.start(), *[x.start() for x in self._subscribers]
+            self.injector.start(),
+            *[x.start() for x in self._subscribers + self._periodic_tasks],
         )
         LOGGER.debug("Bus started.")
 
@@ -251,7 +289,7 @@ class SignalBus:
         """
         LOGGER.debug("Stopping bus.")
         await asyncio.gather(
-            self.injector.stop(), *[x.stop() for x in self._subscribers]
+            self.injector.stop(), *[x.stop() for x in self._subscribers + self._periodic_tasks]
         )
         LOGGER.debug("Bus stopped.")
 
