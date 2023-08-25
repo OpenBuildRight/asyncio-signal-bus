@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from asyncio.queues import Queue
 from logging import getLogger
 from typing import Awaitable, Callable, Dict, List, Optional, SupportsFloat, Type
@@ -91,7 +92,7 @@ class SignalBus:
         queue = Queue()
         self._queues.get(topic_name).append(queue)
 
-        def _wrapper(f: Callable[[S], Awaitable[R]]) -> SignalSubscriber[S, R]:
+        def _wrapper(f):
             s = SignalSubscriber(
                 error_handler(f),
                 queue,
@@ -100,7 +101,11 @@ class SignalBus:
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
-            return s
+
+            @functools.wraps(f)
+            def inner_wrapper(*args, **kwargs):
+                return s(*args, **kwargs)
+            return inner_wrapper
 
         return _wrapper
 
@@ -137,7 +142,7 @@ class SignalBus:
         queue = Queue()
         self._queues.get(topic_name).append(queue)
 
-        def _wrapper(f: Callable[[S], Awaitable[R]]) -> SignalSubscriber[S, R]:
+        def _wrapper(f):
             s = BatchSignalSubscriber(
                 error_handler(f),
                 queue,
@@ -148,13 +153,16 @@ class SignalBus:
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
-            return s
+            @functools.wraps(f)
+            def inner_wrapper(*args, **kwargs):
+                return s(*args, **kwargs)
+            return inner_wrapper
 
         return _wrapper
 
     def publisher(
         self, topic_name="default"
-    ) -> Callable[[Callable[..., Awaitable[S]]], SignalPublisher[S]]:
+    ):
         """
         Decorator for asyncio methods. The publisher returns a signal which is passed
         to subscribers subscribed to the same topic name. The signal may be any data
@@ -165,8 +173,13 @@ class SignalBus:
         """
         queue_getter = QueueGetter(topic_name, self._queues)
 
-        def _wrapper(f: Callable[..., Awaitable[S]]) -> SignalPublisher[S]:
-            return SignalPublisher(f, queue_getter)
+        def _wrapper(f):
+            publisher = SignalPublisher(f, queue_getter)
+
+            @functools.wraps(f)
+            def inner_wrapper(*args, **kwargs):
+                return publisher(*args, **kwargs)
+            return inner_wrapper
 
         return _wrapper
 
