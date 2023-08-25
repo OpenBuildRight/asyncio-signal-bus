@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "asyncio-signal-bus"
-version = "1.4.0"
+version = "1.5.0"
 description = "Internal application publisher/subscriber bus using asyncio queues."
 authors = ["DustinMoriarty <dustin.moriarty@protonmail.com>"]
 readme = "README.md"

@@ -1,10 +1,12 @@
 import asyncio
+import functools
 from asyncio.queues import Queue
 from logging import getLogger
 from typing import Awaitable, Callable, Dict, List, Optional, SupportsFloat, Type
 
 from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.injector import Injector
+from asyncio_signal_bus.periodic_task import PeriodicTask
 from asyncio_signal_bus.publisher import SignalPublisher
 from asyncio_signal_bus.queue_getter import QueueGetter
 from asyncio_signal_bus.subscriber import BatchSignalSubscriber, SignalSubscriber
@@ -59,6 +61,7 @@ class SignalBus:
         self._queues: Dict[str, List[Queue]] = {}
         self._subscribers: List[SignalSubscriber] = []
         self.injector = injector if injector else Injector()
+        self._periodic_tasks = []
 
     def get_queue(self, queue_name: str) -> List[Queue]:
         return self._queues.get(queue_name)
@@ -91,7 +94,7 @@ class SignalBus:
         queue = Queue()
         self._queues.get(topic_name).append(queue)
 
-        def _wrapper(f: Callable[[S], Awaitable[R]]) -> SignalSubscriber[S, R]:
+        def _wrapper(f):
             s = SignalSubscriber(
                 error_handler(f),
                 queue,
@@ -100,7 +103,12 @@ class SignalBus:
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
-            return s
+
+            @functools.wraps(f)
+            def inner_wrapper(*args, **kwargs):
+                return s(*args, **kwargs)
+
+            return inner_wrapper
 
         return _wrapper
 
@@ -137,7 +145,7 @@ class SignalBus:
         queue = Queue()
         self._queues.get(topic_name).append(queue)
 
-        def _wrapper(f: Callable[[S], Awaitable[R]]) -> SignalSubscriber[S, R]:
+        def _wrapper(f):
             s = BatchSignalSubscriber(
                 error_handler(f),
                 queue,
@@ -148,13 +156,16 @@ class SignalBus:
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
-            return s
+
+            @functools.wraps(f)
+            def inner_wrapper(*args, **kwargs):
+                return s(*args, **kwargs)
+
+            return inner_wrapper
 
         return _wrapper
 
-    def publisher(
-        self, topic_name="default"
-    ) -> Callable[[Callable[..., Awaitable[S]]], SignalPublisher[S]]:
+    def publisher(self, topic_name="default"):
         """
         Decorator for asyncio methods. The publisher returns a signal which is passed
         to subscribers subscribed to the same topic name. The signal may be any data
@@ -165,8 +176,14 @@ class SignalBus:
         """
         queue_getter = QueueGetter(topic_name, self._queues)
 
-        def _wrapper(f: Callable[..., Awaitable[S]]) -> SignalPublisher[S]:
-            return SignalPublisher(f, queue_getter)
+        def _wrapper(f):
+            publisher = SignalPublisher(f, queue_getter)
+
+            @functools.wraps(f)
+            def inner_wrapper(*args, **kwargs):
+                return publisher(*args, **kwargs)
+
+            return inner_wrapper
 
         return _wrapper
 
@@ -211,6 +228,41 @@ class SignalBus:
         """
         return self.injector.inject(arg_name, factory)
 
+    def periodic_task(self, period_seconds: int = 10):
+        """
+        Create a periodic task.
+
+        >>> BUS = SignalBus()
+        >>> @BUS.periodic_task(period_seconds=0.5)
+        ... async def print_foos():
+        ...     print("foo")
+        >>> async def main():
+        ...     async with BUS:
+        ...         await asyncio.sleep(2)
+        >>> asyncio.run(main())
+        foo
+        foo
+        foo
+        foo
+
+        The task will block exiting the bus context until it has completed.
+
+        :param period_seconds:
+        :return: Wrapped callable
+        """
+
+        def wrapper(f):
+            periodic_task = PeriodicTask(f, period_seconds=period_seconds)
+            self._periodic_tasks.append(periodic_task)
+
+            @functools.wraps(f)
+            def _inner_wrapper(*args, **kwargs):
+                return periodic_task(*args, **kwargs)
+
+            return _inner_wrapper
+
+        return wrapper
+
     async def start(self):
         """
         Start the signal bus. This is used in cases where it is not practical
@@ -221,7 +273,8 @@ class SignalBus:
         """
         LOGGER.debug("Starting bus.")
         await asyncio.gather(
-            self.injector.start(), *[x.start() for x in self._subscribers]
+            self.injector.start(),
+            *[x.start() for x in self._subscribers + self._periodic_tasks],
         )
         LOGGER.debug("Bus started.")
 
@@ -236,7 +289,8 @@ class SignalBus:
         """
         LOGGER.debug("Stopping bus.")
         await asyncio.gather(
-            self.injector.stop(), *[x.stop() for x in self._subscribers]
+            self.injector.stop(),
+            *[x.stop() for x in self._subscribers + self._periodic_tasks],
         )
         LOGGER.debug("Bus stopped.")
 

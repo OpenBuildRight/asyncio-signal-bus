@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from asyncio.locks import Lock
 from typing import Awaitable, Callable, Generic, List, TypeVar
 
@@ -44,7 +45,12 @@ class Injector:
         def _inject(f: Callable[..., Awaitable]):
             injector_callable = InjectorCallable(f, arg_name, factory)
             self._injector_callables.append(injector_callable)
-            return injector_callable
+
+            @functools.wraps(f)
+            def _wrapper(*args, **kwargs):
+                return injector_callable(*args, **kwargs)
+
+            return _wrapper
 
         return _inject
 
