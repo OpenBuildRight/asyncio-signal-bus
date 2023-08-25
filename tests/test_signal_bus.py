@@ -1,8 +1,6 @@
 import asyncio
-import functools
 from asyncio.queues import Queue
 
-import aiocache
 import pytest
 
 from asyncio_signal_bus import SignalBus
