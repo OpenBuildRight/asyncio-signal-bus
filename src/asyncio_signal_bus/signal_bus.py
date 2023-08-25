@@ -105,6 +105,7 @@ class SignalBus:
             @functools.wraps(f)
             def inner_wrapper(*args, **kwargs):
                 return s(*args, **kwargs)
+
             return inner_wrapper
 
         return _wrapper
@@ -153,16 +154,16 @@ class SignalBus:
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
+
             @functools.wraps(f)
             def inner_wrapper(*args, **kwargs):
                 return s(*args, **kwargs)
+
             return inner_wrapper
 
         return _wrapper
 
-    def publisher(
-        self, topic_name="default"
-    ):
+    def publisher(self, topic_name="default"):
         """
         Decorator for asyncio methods. The publisher returns a signal which is passed
         to subscribers subscribed to the same topic name. The signal may be any data
@@ -179,6 +180,7 @@ class SignalBus:
             @functools.wraps(f)
             def inner_wrapper(*args, **kwargs):
                 return publisher(*args, **kwargs)
+
             return inner_wrapper
 
         return _wrapper

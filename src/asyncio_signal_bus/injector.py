@@ -42,13 +42,14 @@ class Injector:
         self._injector_callables_lock = Lock()
 
     def inject(self, arg_name: str, factory: Callable[..., Awaitable]):
-
         def _inject(f: Callable[..., Awaitable]):
             injector_callable = InjectorCallable(f, arg_name, factory)
             self._injector_callables.append(injector_callable)
+
             @functools.wraps(f)
             def _wrapper(*args, **kwargs):
                 return injector_callable(*args, **kwargs)
+
             return _wrapper
 
         return _inject
