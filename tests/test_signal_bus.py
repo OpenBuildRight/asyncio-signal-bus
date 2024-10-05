@@ -146,8 +146,7 @@ async def test_function_wrapper_subscriber():
     BUS = SignalBus()
 
     @BUS.subscriber()
-    def foo(signal: str):
-        ...
+    def foo(signal: str): ...
 
     assert hasattr(foo, "__name__")
 
@@ -157,8 +156,7 @@ async def test_function_wrapper_batch_subscriber():
     BUS = SignalBus()
 
     @BUS.batch_subscriber()
-    def foo(signal: str):
-        ...
+    def foo(signal: str): ...
 
     assert hasattr(foo, "__name__")
 
@@ -168,8 +166,7 @@ async def test_function_wrapper_publisher():
     BUS = SignalBus()
 
     @BUS.publisher()
-    def foo(signal: str):
-        ...
+    def foo(signal: str): ...
 
     assert hasattr(foo, "__name__")
 
