@@ -79,9 +79,9 @@ class SignalBus:
         signal may be any data type.
         :param topic_name: The name of the topic used to link one or more subscribers
             with one or more publishers.
-        :param error_handler: An error handler used to handle errors within the callable.
-            Error handling should usually terminate at the subscriber, with the
-            subscriber catching all exceptions. Any unhandled errors will block the
+        :param error_handler: An error handler used to handle errors within the
+            callable. Error handling should usually terminate at the subscriber, with
+            the subscriber catching all exceptions. Any unhandled errors will block the
             shutdown of the bus when the bus exits context or the stop method is used.
         :param shutdown_timeout: If the subscriber takes longer than this time during
             shutdown, then the task is killed and an error is raised. If you do not
@@ -127,9 +127,9 @@ class SignalBus:
         seconds in size.
         :param topic_name: The name of the topic used to link one or more subscribers
             with one or more publishers.
-        :param error_handler: An error handler used to handle errors within the callable.
-            Error handling should usually terminate at the subscriber, with the
-            subscriber catching all exceptions. Any unhandled errors will block the
+        :param error_handler: An error handler used to handle errors within the
+            callable. Error handling should usually terminate at the subscriber, with
+            the subscriber catching all exceptions. Any unhandled errors will block the
             shutdown of the bus when the bus exits context or the stop method is used.
         :param shutdown_timeout: If the subscriber takes longer than this time during
             shutdown, then the task is killed and an error is raised. If you do not
