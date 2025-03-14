@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 from asyncio import Queue, Task
+from collections.abc import Sequence
 from logging import getLogger
 from typing import Awaitable, Callable, Generic, Optional, SupportsFloat, SupportsInt, \
     Tuple
@@ -95,7 +96,7 @@ class BatchSignalSubscriber(SignalSubscriber):
         back_off_time: SupportsFloat = None,
         max_items: SupportsInt = 10,
         period_seconds: SupportsFloat = 10,
-        batch_counters: Tuple[BatchCounterAbc, ...] = tuple()
+        batch_counters: Sequence[BatchCounterAbc] = tuple()
     ):
         if period_seconds > shutdown_timeout:
             raise ValueError("Period seconds must be less than the shutdown timeout.")
@@ -106,15 +107,13 @@ class BatchSignalSubscriber(SignalSubscriber):
         super().__init__(f, queue, shutdown_timeout, back_off_time)
         self.max_items = int(max_items)
         self.period_seconds = float(period_seconds)
-        self._batch_counters = batch_counters + tuple([CountBatchCounter(self.max_items), TimeBatchCounter(self.period_seconds)])
+        self._batch_counters = tuple(batch_counters) + tuple([CountBatchCounter(self.max_items), TimeBatchCounter(self.period_seconds)])
         self._batch_counters_lock = asyncio.Lock()
 
     @contextlib.asynccontextmanager
     async def get_batch_counters(self):
         async with self._batch_counters_lock:
             yield self._batch_counters
-
-
 
     async def _batch_task_wrapper(self, coroutine, n_items: int):
         await coroutine
@@ -126,6 +125,10 @@ class BatchSignalSubscriber(SignalSubscriber):
             for counter in batch_counters:
                 counter.clear()
 
+    async def start(self):
+        await self.clear_counters()
+        await super().start()
+
     async def _put_counters(self, value: S):
         async with self.get_batch_counters() as batch_counters:
             for counter in batch_counters:
@@ -135,19 +138,34 @@ class BatchSignalSubscriber(SignalSubscriber):
         async with self.get_batch_counters() as batch_counters:
             return any([x.is_full() for x in batch_counters])
 
+    async def any_counter_would_fill(self, value: S) -> bool:
+        async with self.get_batch_counters() as batch_counters:
+            return any([x.would_fill(value) for x in batch_counters])
+
     async def _listen(self):
         LOGGER.debug("Started listening.")
         batch = []
+        next_batch = []
+        would_fill = False
         await self.clear_counters()
+
         while self._in_context or not self._queue.empty() or batch:
-            if not await self.any_counter_full() and not self._queue.empty():
+            if not self._queue.empty():
                 signal = self._queue.get_nowait()
-                batch.append(signal)
-                await self._put_counters(signal)
-            if batch and await self.any_counter_full():
-                asyncio.create_task(self._batch_task_wrapper(self(batch), len(batch)))
+                if not self.any_counter_would_fill(signal):
+                    batch.append(signal)
+                    await self._put_counters(signal)
+                else:
+                    next_batch.append(signal)
+                    would_fill = True
+            if await self.any_counter_full() or would_fill:
+                if batch:
+                    asyncio.create_task(self._batch_task_wrapper(self(batch), len(batch)))
+                batch.clear()
+                batch += next_batch
+                next_batch.clear()
+                would_fill = False
                 await self.clear_counters()
-                batch = []
             if not batch:
                 await asyncio.sleep(self.back_off_time)
             await asyncio.sleep(1e-10)

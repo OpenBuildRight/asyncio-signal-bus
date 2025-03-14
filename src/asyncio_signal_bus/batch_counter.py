@@ -14,6 +14,9 @@ class BatchCounterAbc(ABC):
     def is_full(self) -> bool: ...
 
     @abstractmethod
+    def would_fill(self, value: S) -> bool: ...
+
+    @abstractmethod
     def clear(self) -> None: ...
 
 
@@ -28,6 +31,9 @@ class CountBatchCounter(BatchCounterAbc):
 
     def is_full(self) -> bool:
         return self._count >= self._max_items
+
+    def would_fill(self, value: S) -> bool:
+        return (self._count + 1) >= self._max_items
 
     def clear(self) -> None:
         self._count = 0
@@ -55,6 +61,9 @@ class TimeBatchCounter(BatchCounterAbc):
         time_elapsed = time_now - self._time_start
         return time_elapsed >= self._max_period_seconds
 
+    def would_fill(self, value: S) -> bool:
+        return self.is_full()
+
     def clear(self):
         self._time_start = self._time_provider()
 
@@ -72,6 +81,9 @@ class LengthBatchCounter(BatchCounterAbc):
 
     def is_full(self) -> bool:
         return self._count >= self._max_length
+
+    def would_fill(self, value: S) -> bool:
+        return (self._count + len(value)) >= self._max_length
 
     def clear(self) -> None:
         self._count = 0

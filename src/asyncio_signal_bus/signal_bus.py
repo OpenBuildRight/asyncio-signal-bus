@@ -2,8 +2,9 @@ import asyncio
 import functools
 from asyncio.queues import Queue
 from logging import getLogger
-from typing import Awaitable, Callable, Dict, List, Optional, SupportsFloat, Type
+from typing import Awaitable, Callable, Dict, List, Optional, SupportsFloat, Type, Tuple, Sequence
 
+from asyncio_signal_bus.batch_counter import BatchCounterAbc
 from asyncio_signal_bus.error_handler import SubscriberErrorHandler
 from asyncio_signal_bus.injector import Injector
 from asyncio_signal_bus.periodic_task import PeriodicTask
@@ -120,11 +121,66 @@ class SignalBus:
         back_off_time: SupportsFloat = None,
         max_items: int = 10,
         period_seconds: float = 10,
+        batch_counters: Sequence[BatchCounterAbc] = tuple()
     ):
         """
         A subscriber that consumes batches of events. The subscriber will wait no longer
         than the period_seconds between aggregations. Batches will not exceed batch
         seconds in size.
+
+        >>> import json
+        >>> BUS = SignalBus()
+
+        >>> @BUS.publisher(topic_name="greeting")
+        ... async def generate_uppercase(arg: str):
+        ...     return arg.upper()
+
+        >>> @BUS.batch_subscriber(
+        ...     topic_name="greeting",
+        ...     max_items = 3,
+        ...     period_seconds = 1,
+        ... )
+        ... async def print_batch(batch: List[str]):
+        ...     print(json.dumps(batch))
+
+        >>> async def main():
+        ...     async with BUS:
+        ...         await asyncio.gather(*[generate_uppercase(f"hello {x}") for x in range(9)])
+        >>> asyncio.run(main())
+        ["HELLO 0", "HELLO 1", "HELLO 2"]
+        ["HELLO 3", "HELLO 4", "HELLO 5"]
+        ["HELLO 6", "HELLO 7", "HELLO 8"]
+
+        Additional counters can be added to further limit batches. For example, you
+        can use the LengthBatchCounter to control the total length of items sent.
+        >>> from asyncio_signal_bus.batch_counter import LengthBatchCounter
+        >>> BUS = SignalBus()
+
+        >>> @BUS.publisher(topic_name="greeting")
+        ... async def generate_uppercase(arg: str):
+        ...     return arg.upper()
+
+        >>> @BUS.batch_subscriber(
+        ...     topic_name="greeting",
+        ...     max_items = 3,
+        ...     period_seconds = 1,
+        ...     batch_counters=[LengthBatchCounter(9)]
+        ... )
+        ... async def print_batch(batch: List[str]):
+        ...     all_items = "".join(batch)
+        ...     print(f"items = {all_items}, length = {len(all_items)}")
+
+        >>> async def main():
+        ...     async with BUS:
+        ...         await generate_uppercase("abc")
+        ...         await generate_uppercase("defg")
+        ...         await generate_uppercase("h")
+        ...         await generate_uppercase("ijklmnopqrs")
+        ...         await generate_uppercase("tu")
+        ...         await generate_uppercase("vwxyz")
+        >>> asyncio.run(main())
+        items = "abcdefgh" length = 9
+
         :param topic_name: The name of the topic used to link one or more subscribers
             with one or more publishers.
         :param error_handler: An error handler used to handle errors within the
@@ -139,6 +195,9 @@ class SignalBus:
             calculated from the period_seconds.
         :param max_items: The maximum amount of items for the batch.
         :param period_seconds: The maximum amount of time to wait between batches.
+        :param batch_counters: Sequence of custom batch counters used to limit the
+            size of a batch. If any batch counter is full, including the batch counters
+            created from max_items and period_seconds, then the batch is sent.
         :return: Wrapped callable
         """
         self._queues.setdefault(topic_name, [])
@@ -153,6 +212,7 @@ class SignalBus:
                 max_items=max_items,
                 period_seconds=period_seconds,
                 back_off_time=back_off_time,
+                batch_counters=batch_counters,
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
             self._subscribers.append(s)
