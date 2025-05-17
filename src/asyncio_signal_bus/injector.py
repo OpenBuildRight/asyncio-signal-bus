@@ -37,7 +37,6 @@ class InjectorCallable(Generic[R]):
 
 
 class InjectorAbc(abc.ABC):
-
     @property
     @abc.abstractmethod
     def injector_callables(self) -> set[InjectorCallable]: ...

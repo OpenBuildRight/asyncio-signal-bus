@@ -17,7 +17,6 @@ LOGGER = getLogger(__name__)
 
 
 class SignalBusAbc(abc.ABC):
-
     @property
     @abc.abstractmethod
     def queues(self) -> dict[str, set[Queue]]: ...
