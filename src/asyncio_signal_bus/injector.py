@@ -2,16 +2,17 @@ import abc
 import asyncio
 import functools
 from asyncio.locks import Lock
-from typing import Awaitable, Callable, Generic, List, TypeVar
+from typing import Awaitable, Callable, Generic, TypeVar
 
 R = TypeVar("R")
 
+
 class InjectorCallable(Generic[R]):
     def __init__(
-            self,
-            f: Callable[..., Awaitable[R]],
-            arg_name: str,
-            factory: Callable[..., Awaitable],
+        self,
+        f: Callable[..., Awaitable[R]],
+        arg_name: str,
+        factory: Callable[..., Awaitable],
     ):
         self._in_context = False
         self._in_context_lock = Lock()
@@ -34,12 +35,13 @@ class InjectorCallable(Generic[R]):
         _kwargs.update(kwargs)
         return await self._f(*args, **_kwargs)
 
+
 class InjectorAbc(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def injector_callables(self) -> set[InjectorCallable]:
-        ...
+    def injector_callables(self) -> set[InjectorCallable]: ...
+
 
 class Injector(InjectorAbc):
     """
@@ -81,6 +83,11 @@ class Injector(InjectorAbc):
         return self._injector_callables
 
     def connect(self, *injectors: InjectorAbc):
+        """
+        Connect injectors.
+        :param injectors:
+        :return:
+        """
         for injector in injectors:
             self._injector_callables.update(injector.injector_callables)
         for injector in injectors:
@@ -112,5 +119,3 @@ class Injector(InjectorAbc):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.stop()
-
-

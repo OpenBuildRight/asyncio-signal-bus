@@ -15,23 +15,25 @@ from asyncio_signal_bus.types import R, S
 
 LOGGER = getLogger(__name__)
 
+
 class SignalBusAbc(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def queues(self) -> dict[str, set[Queue]]:...
+    def queues(self) -> dict[str, set[Queue]]: ...
 
     @property
     @abc.abstractmethod
-    def subscribers(self) -> List[SignalSubscriber]:...
+    def subscribers(self) -> List[SignalSubscriber]: ...
 
     @property
     @abc.abstractmethod
-    def periodic_tasks(self) -> List[PeriodicTask]:...
+    def periodic_tasks(self) -> List[PeriodicTask]: ...
 
     @property
     @abc.abstractmethod
-    def injector(self) -> Injector:...
+    def injector(self) -> Injector: ...
+
 
 class SignalBus(SignalBusAbc):
     """
@@ -144,7 +146,6 @@ class SignalBus(SignalBusAbc):
                 b.queues.setdefault(k, set())
                 b.queues[k].update(v)
             b.injector.connect(b.injector)
-
 
     def get_queue(self, queue_name: str) -> set[Queue]:
         return self._queues.get(queue_name)
@@ -357,7 +358,10 @@ class SignalBus(SignalBusAbc):
         LOGGER.debug("Starting bus.")
         await asyncio.gather(
             self.injector.start(),
-            *([x.start() for x in self._subscribers]+[x.start() for x in self._periodic_tasks]),
+            *(
+                [x.start() for x in self._subscribers]
+                + [x.start() for x in self._periodic_tasks]
+            ),
         )
         LOGGER.debug("Bus started.")
 
@@ -373,8 +377,10 @@ class SignalBus(SignalBusAbc):
         LOGGER.debug("Stopping bus.")
         await asyncio.gather(
             self.injector.stop(),
-            *([x.stop() for x in self._subscribers] + [x.stop() for x in
-                                                        self._periodic_tasks]),
+            *(
+                [x.stop() for x in self._subscribers]
+                + [x.stop() for x in self._periodic_tasks]
+            ),
         )
         LOGGER.debug("Bus stopped.")
 
