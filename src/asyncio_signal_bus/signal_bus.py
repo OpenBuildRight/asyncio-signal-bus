@@ -1,3 +1,4 @@
+import abc
 import asyncio
 import functools
 from asyncio.queues import Queue
@@ -15,7 +16,25 @@ from asyncio_signal_bus.types import R, S
 LOGGER = getLogger(__name__)
 
 
-class SignalBus:
+class SignalBusAbc(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def queues(self) -> dict[str, set[Queue]]: ...
+
+    @property
+    @abc.abstractmethod
+    def subscribers(self) -> List[SignalSubscriber]: ...
+
+    @property
+    @abc.abstractmethod
+    def periodic_tasks(self) -> List[PeriodicTask]: ...
+
+    @property
+    @abc.abstractmethod
+    def injector(self) -> Injector: ...
+
+
+class SignalBus(SignalBusAbc):
     """
     Asyncio signal bus which uses asyncio queues to send messages between publishers
     and subscribers. The signal bus should be used as a context manager in order to
@@ -58,12 +77,76 @@ class SignalBus:
     """
 
     def __init__(self, injector=None):
-        self._queues: Dict[str, List[Queue]] = {}
-        self._subscribers: List[SignalSubscriber] = []
-        self.injector = injector if injector else Injector()
-        self._periodic_tasks = []
+        self._queues: Dict[str, set[Queue]] = {}
+        self._subscribers: set[SignalSubscriber] = set()
+        self._injector = injector if injector else Injector()
+        self._periodic_tasks: set[PeriodicTask] = set()
 
-    def get_queue(self, queue_name: str) -> List[Queue]:
+    @property
+    def queues(self) -> dict[str, set[Queue]]:
+        return self._queues
+
+    @property
+    def subscribers(self) -> set[SignalSubscriber]:
+        return self._subscribers
+
+    @property
+    def periodic_tasks(self) -> set[PeriodicTask]:
+        return self._periodic_tasks
+
+    @property
+    def injector(self) -> Injector:
+        return self._injector
+
+    def connect(self, *bus: SignalBusAbc):
+        """
+        Register a signal bus. This is most often used when combining signal buses from
+        multiple files.
+
+        In one file we may create a child bus for a publisher.
+
+        >>> CHILD_BUS_1 = SignalBus()
+        >>> @CHILD_BUS_1.publisher(topic_name="greeting")
+        ... async def generate_uppercase(arg: str):
+        ...     return arg.upper()
+
+        In another file we may create another child bus for a subscriber.
+
+        >>> CHILD_BUS_2 = SignalBus()
+        >>> @CHILD_BUS_2.subscriber(topic_name="greeting")
+        ... async def print_signal(signal: str):
+        ...     await asyncio.sleep(0.1)
+        ...     print(signal)
+
+        Finally, we register both buses in a parent bus.
+
+        >>> PARENT_BUS = SignalBus()
+        >>> PARENT_BUS.connect(CHILD_BUS_1, CHILD_BUS_2)
+        ...
+        >>> async def main():
+        ...     async with PARENT_BUS:
+        ...         await generate_uppercase("hello world!")
+        ...
+        >>> asyncio.run(main())
+        HELLO WORLD!
+
+        :param bus:
+        :return:
+        """
+        for b in bus:
+            for k, v in b.queues.items():
+                self._queues.setdefault(k, set())
+                self._queues[k].update(v)
+            self._subscribers.update(b.subscribers)
+            self._periodic_tasks.update(b.periodic_tasks)
+            self.injector.connect(b.injector)
+        for b in bus:
+            for k, v in self._queues.items():
+                b.queues.setdefault(k, set())
+                b.queues[k].update(v)
+            b.injector.connect(b.injector)
+
+    def get_queue(self, queue_name: str) -> set[Queue]:
         return self._queues.get(queue_name)
 
     def subscriber(
@@ -90,9 +173,9 @@ class SignalBus:
             getting another item.
         :return: Wrapped callable.
         """
-        self._queues.setdefault(topic_name, [])
+        self._queues.setdefault(topic_name, set())
         queue = Queue()
-        self._queues.get(topic_name).append(queue)
+        self._queues.get(topic_name).add(queue)
 
         def _wrapper(f):
             s = SignalSubscriber(
@@ -102,7 +185,7 @@ class SignalBus:
                 back_off_time=back_off_time,
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
-            self._subscribers.append(s)
+            self._subscribers.add(s)
 
             @functools.wraps(f)
             def inner_wrapper(*args, **kwargs):
@@ -141,9 +224,9 @@ class SignalBus:
         :param period_seconds: The maximum amount of time to wait between batches.
         :return: Wrapped callable
         """
-        self._queues.setdefault(topic_name, [])
+        self._queues.setdefault(topic_name, set())
         queue = Queue()
-        self._queues.get(topic_name).append(queue)
+        self._queues.get(topic_name).add(queue)
 
         def _wrapper(f):
             s = BatchSignalSubscriber(
@@ -155,7 +238,7 @@ class SignalBus:
                 back_off_time=back_off_time,
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
-            self._subscribers.append(s)
+            self._subscribers.add(s)
 
             @functools.wraps(f)
             def inner_wrapper(*args, **kwargs):
@@ -253,7 +336,7 @@ class SignalBus:
 
         def wrapper(f):
             periodic_task = PeriodicTask(f, period_seconds=period_seconds)
-            self._periodic_tasks.append(periodic_task)
+            self._periodic_tasks.add(periodic_task)
 
             @functools.wraps(f)
             def _inner_wrapper(*args, **kwargs):
@@ -274,7 +357,10 @@ class SignalBus:
         LOGGER.debug("Starting bus.")
         await asyncio.gather(
             self.injector.start(),
-            *[x.start() for x in self._subscribers + self._periodic_tasks],
+            *(
+                [x.start() for x in self._subscribers]
+                + [x.start() for x in self._periodic_tasks]
+            ),
         )
         LOGGER.debug("Bus started.")
 
@@ -290,7 +376,10 @@ class SignalBus:
         LOGGER.debug("Stopping bus.")
         await asyncio.gather(
             self.injector.stop(),
-            *[x.stop() for x in self._subscribers + self._periodic_tasks],
+            *(
+                [x.stop() for x in self._subscribers]
+                + [x.stop() for x in self._periodic_tasks]
+            ),
         )
         LOGGER.debug("Bus stopped.")
 

@@ -6,6 +6,25 @@ on:
     branches:
       - "*"
 jobs:
+  code-style:
+    name: code-style
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: install poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python - -y
+      - name: checkout code
+        uses: actions/checkout@v2
+      - name: install package
+        run: poetry install
+      - name: ruff check
+        run: poetry run ruff check
+      - name: ruff format
+        run: poetry run ruff format --check
   unit-test:
     name: unit test
     runs-on: ubuntu-latest
@@ -21,11 +40,9 @@ jobs:
       uses: actions/checkout@v2
     - name: install package
       run: poetry install
+    - name: ruff check
+      run: poetry run ruff check
+    - name: ruff format
+      run: poetry run ruff format --check
     - name: pytest
       run: poetry run pytest
-    - name: black
-      run: poetry run black --check .
-    - name: isort
-      run: poetry run isort -c .
-    - name: flake8
-      run: poetry run flake8

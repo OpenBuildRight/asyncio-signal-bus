@@ -216,3 +216,81 @@ async def test_periodic_task_gracefull_exit():
         await asyncio.sleep(0.01)
 
     assert result == [1]
+
+
+@pytest.mark.asyncio
+async def test_connect():
+    bus_1 = SignalBus()
+    bus_2 = SignalBus()
+    bus_3 = SignalBus()
+    result_queue = Queue()
+
+    @bus_1.publisher(topic_name="foo")
+    async def foo_publisher(arg: str):
+        print("Publishing message.")
+        await asyncio.sleep(1)
+        return f"message:{arg}"
+
+    @bus_2.subscriber(topic_name="foo")
+    async def foo_subscriber(signal: str):
+        print("Received message.")
+        await asyncio.sleep(1)
+        await result_queue.put(signal)
+
+    bus_3.connect(bus_1, bus_2)
+
+    input = ["a", "b", "c"]
+    expected_output = ["message:a", "message:b", "message:c"]
+
+    async with bus_3:
+        await asyncio.gather(*[foo_publisher(x) for x in input])
+    results = []
+    while not result_queue.empty():
+        results.append(await result_queue.get())
+    results.sort()
+    assert expected_output == results
+
+
+@pytest.mark.asyncio
+async def test_connect_with_dependency_injection():
+    bus_1 = SignalBus()
+    bus_2 = SignalBus()
+    bus_3 = SignalBus()
+    result_queue = Queue()
+
+    async def thing_generator():
+        return "thing"
+
+    async def thing_2_generator():
+        return "thing_2"
+
+    @bus_1.publisher(topic_name="foo")
+    @bus_1.inject("thing", thing_generator)
+    async def foo_publisher(arg: str, thing: str):
+        print("Publishing message.")
+        await asyncio.sleep(1)
+        return f"message:{arg}:{thing}"
+
+    @bus_2.subscriber(topic_name="foo")
+    @bus_2.inject("thing", thing_2_generator)
+    async def foo_subscriber(signal: str, thing: str):
+        print("Received message.")
+        await asyncio.sleep(1)
+        await result_queue.put(signal + ":" + thing)
+
+    bus_3.connect(bus_1, bus_2)
+
+    input = ["a", "b", "c"]
+    expected_output = [
+        "message:a:thing:thing_2",
+        "message:b:thing:thing_2",
+        "message:c:thing:thing_2",
+    ]
+
+    async with bus_3:
+        await asyncio.gather(*[foo_publisher(x) for x in input])
+    results = []
+    while not result_queue.empty():
+        results.append(await result_queue.get())
+    results.sort()
+    assert expected_output == results
