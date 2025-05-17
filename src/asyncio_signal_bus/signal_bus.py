@@ -29,6 +29,10 @@ class SignalBusAbc(abc.ABC):
     @abc.abstractmethod
     def periodic_tasks(self) -> List[PeriodicTask]:...
 
+    @property
+    @abc.abstractmethod
+    def injector(self) -> Injector:...
+
 class SignalBus(SignalBusAbc):
     """
     Asyncio signal bus which uses asyncio queues to send messages between publishers
@@ -74,7 +78,7 @@ class SignalBus(SignalBusAbc):
     def __init__(self, injector=None):
         self._queues: Dict[str, set[Queue]] = {}
         self._subscribers: List[SignalSubscriber] = []
-        self.injector = injector if injector else Injector()
+        self._injector = injector if injector else Injector()
         self._periodic_tasks = []
 
     @property
@@ -89,7 +93,11 @@ class SignalBus(SignalBusAbc):
     def periodic_tasks(self) -> list[PeriodicTask]:
         return self._periodic_tasks
 
-    def register_buses(self, *bus: SignalBusAbc):
+    @property
+    def injector(self) -> Injector:
+        return self._injector
+
+    def connect(self, *bus: SignalBusAbc):
         """
         Register a signal bus. This is most often used when combining signal buses from
         multiple files.
@@ -112,7 +120,7 @@ class SignalBus(SignalBusAbc):
         Finally, we register both buses in a parent bus.
 
         >>> PARENT_BUS = SignalBus()
-        >>> PARENT_BUS.register_buses(CHILD_BUS_1, CHILD_BUS_2)
+        >>> PARENT_BUS.connect(CHILD_BUS_1, CHILD_BUS_2)
         ...
         >>> async def main():
         ...     async with PARENT_BUS:
@@ -130,10 +138,12 @@ class SignalBus(SignalBusAbc):
                 self._queues[k].update(v)
             self._subscribers += b.subscribers
             self._periodic_tasks += b.periodic_tasks
+            self.injector.connect(b.injector)
         for b in bus:
             for k, v in self._queues.items():
                 b.queues.setdefault(k, set())
                 b.queues[k].update(v)
+            b.injector.connect(b.injector)
 
 
     def get_queue(self, queue_name: str) -> set[Queue]:
