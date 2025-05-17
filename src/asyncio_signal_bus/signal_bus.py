@@ -77,20 +77,20 @@ class SignalBus(SignalBusAbc):
 
     def __init__(self, injector=None):
         self._queues: Dict[str, set[Queue]] = {}
-        self._subscribers: List[SignalSubscriber] = []
+        self._subscribers: set[SignalSubscriber] = set()
         self._injector = injector if injector else Injector()
-        self._periodic_tasks = []
+        self._periodic_tasks: set[PeriodicTask] = set()
 
     @property
     def queues(self) -> dict[str, set[Queue]]:
         return self._queues
 
     @property
-    def subscribers(self) -> list[SignalSubscriber]:
+    def subscribers(self) -> set[SignalSubscriber]:
         return self._subscribers
 
     @property
-    def periodic_tasks(self) -> list[PeriodicTask]:
+    def periodic_tasks(self) -> set[PeriodicTask]:
         return self._periodic_tasks
 
     @property
@@ -136,8 +136,8 @@ class SignalBus(SignalBusAbc):
             for k, v in b.queues.items():
                 self._queues.setdefault(k, set())
                 self._queues[k].update(v)
-            self._subscribers += b.subscribers
-            self._periodic_tasks += b.periodic_tasks
+            self._subscribers.update(b.subscribers)
+            self._periodic_tasks.update(b.periodic_tasks)
             self.injector.connect(b.injector)
         for b in bus:
             for k, v in self._queues.items():
@@ -185,7 +185,7 @@ class SignalBus(SignalBusAbc):
                 back_off_time=back_off_time,
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
-            self._subscribers.append(s)
+            self._subscribers.add(s)
 
             @functools.wraps(f)
             def inner_wrapper(*args, **kwargs):
@@ -238,7 +238,7 @@ class SignalBus(SignalBusAbc):
                 back_off_time=back_off_time,
             )
             LOGGER.debug(f"Registering subscriber to topic {topic_name}")
-            self._subscribers.append(s)
+            self._subscribers.add(s)
 
             @functools.wraps(f)
             def inner_wrapper(*args, **kwargs):
@@ -336,7 +336,7 @@ class SignalBus(SignalBusAbc):
 
         def wrapper(f):
             periodic_task = PeriodicTask(f, period_seconds=period_seconds)
-            self._periodic_tasks.append(periodic_task)
+            self._periodic_tasks.add(periodic_task)
 
             @functools.wraps(f)
             def _inner_wrapper(*args, **kwargs):
@@ -357,7 +357,7 @@ class SignalBus(SignalBusAbc):
         LOGGER.debug("Starting bus.")
         await asyncio.gather(
             self.injector.start(),
-            *[x.start() for x in self._subscribers + self._periodic_tasks],
+            *([x.start() for x in self._subscribers]+[x.start() for x in self._periodic_tasks]),
         )
         LOGGER.debug("Bus started.")
 
@@ -373,7 +373,8 @@ class SignalBus(SignalBusAbc):
         LOGGER.debug("Stopping bus.")
         await asyncio.gather(
             self.injector.stop(),
-            *[x.stop() for x in self._subscribers + self._periodic_tasks],
+            *([x.stop() for x in self._subscribers] + [x.stop() for x in
+                                                        self._periodic_tasks]),
         )
         LOGGER.debug("Bus stopped.")
 
