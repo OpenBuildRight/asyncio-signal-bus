@@ -145,3 +145,50 @@ async def main():
         await asyncio.sleep(5)
 asyncio.run(main())
 ```
+
+## Buses Across Multiple Modules
+Most practical use of asyncio-signal-bus involve publishers and subscribers across 
+multiple modules or files. In order to connect buses across modules we make a bus in 
+each file.
+
+```python
+# my_app/module_1.py
+from asyncio_signal_bus import SignalBus
+
+BUS_1 = SignalBus()
+
+@BUS_1.publisher(topic_name="foo")
+async def foo_publisher(arg: str):
+    signal = {"message": arg}
+    return signal
+```
+
+```python
+# my_app/module_2.py
+from asyncio_signal_bus import SignalBus
+import json
+
+BUS_2 = SignalBus()
+
+@BUS_2.subscriber(topic_name="foo")
+async def foo_subscriber_0(signal: dict):
+    print(f"foo subscriber 0 received {json.dumps(signal)}")
+```
+
+Now we connect all buses in a parent bus. All buses will now function as a single bus.
+
+```python
+# my_app/__main__.py
+import asyncio
+from asyncio_signal_bus import SignalBus
+from my_app.module_1 import BUS_1, foo_publisher
+from my_app.module_2 import BUS_2
+
+PARENT_BUS = SignalBus()
+PARENT_BUS.connect(BUS_1, BUS_2)
+
+async def main():
+    inputs = [f"message:{i}" for i in range(10)]
+    async with PARENT_BUS:
+        await asyncio.gather(*[foo_publisher(x) for x in inputs])
+```
